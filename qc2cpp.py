@@ -1,5 +1,5 @@
 import qiskit
-from qiskit.circuit.library import HGate
+from qiskit.circuit.library import HGate, XGate
 
 q = qiskit.QuantumRegister(14)
 c = qiskit.ClassicalRegister(14)
@@ -9,6 +9,8 @@ qc.x(q[0])
 qc.cx(q[0], q[3])
 qc.ccx(q[0], q[1], q[2])
 qc.mcx(q[1:6], q[0])
+
+qc.append(XGate().control(2, ctrl_state=0b10), [q[0], q[1], q[4]])
 
 qc.h(q[0])
 qc.ch(q[0],q[1])
@@ -63,7 +65,7 @@ print(f"set_num_clbits({num_clbits});")
 
 def get_base_gate_name(s: str) -> str:
     import re
-    return re.sub(r'^(?:mc|cc|c\d*)', '', s)
+    return re.sub(r'^(?:mc|cc|c\d*)|_o\d+$', '', s)
 
 for gate in qc.data:
     qubit_num_list = tuple(qubit2num_dict[qubit] for qubit in gate.qubits)
@@ -74,4 +76,14 @@ for gate in qc.data:
         no_ctrl_gate_name = get_base_gate_name(gate.operation.name)
         ctrl_qubit_num_list = qubit_num_list[:-1]
         target_qubit_num = qubit_num_list[-1]
-        print(f"sim.gate_{no_ctrl_gate_name}({{{target_qubit_num}}}, {{{','.join(str(ctrl_qubit_num) for ctrl_qubit_num in ctrl_qubit_num_list)}}}, {{}});")
+
+        ctrl_state = getattr(gate.operation, 'ctrl_state', None)
+        neg_ctrl_qubit_num_list = []
+        if ctrl_state is not None:
+            for i, ctrl_qubit_num in enumerate(ctrl_qubit_num_list):
+                if not (ctrl_state >> i) & 1:
+                    neg_ctrl_qubit_num_list.append(ctrl_qubit_num)
+
+        print(
+            f"sim.gate_{no_ctrl_gate_name}({{{target_qubit_num}}}, {{{','.join(str(ctrl_qubit_num) for ctrl_qubit_num in ctrl_qubit_num_list)}}}, {{{','.join(str(num) for num in neg_ctrl_qubit_num_list)}}});"
+        )
